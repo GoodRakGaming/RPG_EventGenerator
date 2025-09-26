@@ -1,0 +1,179 @@
+flowchart TD
+    subgraph RPG_EventGenerator["RPG_EventGenerator.bas"]
+        Start([Начало - Main])
+        Init[Инициализация систем<br/>- Randomize<br/>- InitializeValidation<br/>- InitializeCharacterHistory]
+        ReadClass[Чтение класса из UI<br/>ячейка B2]
+    end
+
+    subgraph ClassConfiguration["ClassConfiguration.bas"]
+        GetConfig[GetClassConfiguration<br/>Загрузка конфигурации класса]
+    end
+
+    subgraph ValidationLogger["ValidationLogger.bas"]
+        ValidateAll[Валидация конфигурации класса]
+        ValidateCrit[Проверка критических:<br/>- Лист данных<br/>- Порог_Опасности_<имя класса><br/>- Опасность_<имя класса><br/>- Путь_<имя класса>]
+        ValidateOpt[Проверка опциональных:<br/>- Таблицы событий Имя таблиц = уникальные значения таблицы путь_<имя класса><br/>- Дополнительные данные]
+        CollectErrors[Сбор всех ошибок]
+    end
+
+    subgraph BaseGenerator["BaseGenerator.bas (будущий)"]
+        BaseGen[Базовый генератор<br/>для нереализованных классов]
+    end
+  
+    Start --> Init
+    Init --> ReadClass
+    ReadClass --> GetConfig
+    
+    GetConfig --> CheckImplemented{Класс полностью<br/>реализован?<br/>IsFullyImplemented}
+    
+    CheckImplemented -->|Да| ValidateAll
+    CheckImplemented -->|Нет| ReadBaseFlag[Проверить флаг<br/>использования базового генератора<br/>ячейка TBD]
+    
+    ReadBaseFlag --> UseBase{Использовать<br/>базовый генератор?}
+    UseBase -->|Нет| ValidateAll
+    UseBase -->|Да| BaseGen
+    
+    ValidateAll --> ValidateCrit
+    ValidateCrit --> ValidateOpt
+    ValidateOpt --> CollectErrors
+    
+    
+    CollectErrors --> HasCritical1{Есть критические<br/>ошибки?}
+    
+    HasCritical1 -->|Да| ShowErrors1[Показать все ошибки<br/>ShowValidationResults]
+    HasCritical1 -->|Нет| HasWarnings{Есть<br/>предупреждения?}
+    
+    
+    HasWarnings -->|Да| ShowWarnings[Показать предупреждения<br/>Продолжить генерацию]
+    HasWarnings -->|Нет| GenerateFull[Продродолжить генерацию]
+    
+    ShowErrors1 --> StopGen[Остановка генерации]
+    
+    ShowWarnings --> SingleOrBatch{Режим генерации?}
+    BaseGen --> SingleOrBatch
+    GenerateFull --> SingleOrBatch
+    
+    SingleOrBatch -->|Одно событие| GenerateSingleEvent
+    SingleOrBatch -->|Полная история| GenerateFullHistory
+    
+    subgraph EventGeneration["Генерация события"]
+        GenerateSingleEvent[GenerateEnhancedEvent_SaveHistory]
+        GenerateFullHistory[GenerateCharacterHistory<br/>Цикл по десятилетиям]
+        
+        ReadPath[Чтение пути из UI<br/>ячейка B23]
+        GenDanger[Генерация опасности<br/>- Бросок d100<br/>- Сравнение с порогом]
+        DangerCheck{Есть<br/>опасность?}
+        GetDangerType[Бросок d10<br/>по таблице Опасность_*]
+        
+        EventLoop[Цикл попыток генерации<br/>max = 50]
+        RollEvent[Бросок d10<br/>по таблице Путь_*]
+        GetBaseEvent[Получение базового события]
+        IsUnique{Событие<br/>уникальное?}
+        AlreadyUsed{Уже<br/>использовано?}
+        NextAttempt[Следующая попытка]
+        CheckAttempts{Попытки < 50?}
+        
+        ProcessEvent[Обработка события]
+        CheckTable{Есть таблица<br/>событий?}
+        GetCommands[Получить команды<br/>из колонки D]
+        HasCommands{Есть<br/>команды?}
+        ExecuteRolls[Выполнение команд:<br/>ROLL, SELECT, IF]
+        
+        ProcessedEvent[Обработанное событие<br/>с деталями]
+        SaveUnique{Событие<br/>уникальное?}
+        AddToHistory[Добавить в историю<br/>UsedUniqueEvents]
+        WriteResults[Запись результатов:<br/>- В UI<br/>- В лист История]
+        
+        CheckMoreEvents{Есть еще<br/>десятилетия?}
+        NextDecade[Следующее десятилетие]
+        Fallback[Fallback:<br/>'Спокойное десятилетие']
+    end
+    
+    GenerateSingleEvent --> ReadPath
+    GenerateFullHistory --> ReadPath
+    
+    ReadPath --> GenDanger
+    GenDanger --> DangerCheck
+    
+    DangerCheck -->|Да| GetDangerType
+    DangerCheck -->|Нет| EventLoop
+
+    GetDangerType --> SaveUnique1{Опасность<br/>уникальная?}
+    SaveUnique1 -->|Да | AlreadyUsed1{Уже<br/>использовано?}
+    SaveUnique1 -->|Нет| ProcessDanger[Обработка Опасности]
+    
+    AlreadyUsed1 -->|Да | NextAttempt1[Следующая попытка]
+    AlreadyUsed1 -->|Нет| ProcessDanger
+
+    NextAttempt1 --> CheckAttempts1{Попытки < 50?}
+    CheckAttempts1 -->|Да | GetDangerType
+    CheckAttempts1 -->|Нет| Fallback1[Fallback:<br/>'Не было опасности']
+    Fallback1 --> EventLoop
+    
+    ProcessDanger --> CheckTable1{Есть таблица описания опасности?}
+    CheckTable1 -->|Нет| UseBaseDunger[Записать базовую опасность]
+    CheckTable1 -->|Да | GetCommands1[Получить команды<br/>из колонки С]
+
+    GetCommands1 --> HasCommands1{Есть<br/>команды?}
+    HasCommands1 -->|Нет| UseBaseDunger
+    HasCommands1 -->|Да | ExecuteRolls1[Выполнение команд:<br/>ROLL, SELECT, IF]
+    
+    UseBaseDunger --> ProcessedEvent1[Обработанная опасность<br/>с деталями]
+    ExecuteRolls1 --> ProcessedEvent1[Обработанная опасность<br/>с деталями]
+    ProcessedEvent1 --> EventLoop
+
+    EventLoop
+    
+    EventLoop --> RollEvent
+    RollEvent --> GetBaseEvent
+    GetBaseEvent --> IsUnique
+    
+    IsUnique -->|Да| AlreadyUsed
+    IsUnique -->|Нет| ProcessEvent
+    
+    AlreadyUsed -->|Да| NextAttempt
+    AlreadyUsed -->|Нет| ProcessEvent
+    
+    NextAttempt --> CheckAttempts
+    CheckAttempts -->|Да| RollEvent
+    CheckAttempts -->|Нет| Fallback
+    
+    ProcessEvent --> CheckTable
+    CheckTable -->|Да| GetCommands
+    CheckTable -->|Нет| UseBaseEvent[Записать<br/>базовое событие]
+    
+    GetCommands --> HasCommands
+    HasCommands -->|Да| ExecuteRolls
+    HasCommands -->|Нет| UseBaseEvent
+    
+    ExecuteRolls --> ProcessedEvent
+    UseBaseEvent --> ProcessedEvent
+    Fallback --> ProcessedEvent
+    
+    ProcessedEvent --> SaveUnique
+    SaveUnique -->|Да| AddToHistory
+    SaveUnique -->|Нет| WriteResults
+    
+    AddToHistory --> WriteResults
+    
+    WriteResults --> CheckBatchMode{Режим полной<br/>истории?}
+    
+    CheckBatchMode -->|Да| CheckMoreEvents
+    CheckBatchMode -->|Нет| ShowSuccess
+    
+    CheckMoreEvents -->|Да| NextDecade
+    CheckMoreEvents -->|Нет| ShowSuccess
+    
+    NextDecade --> GenDanger
+    
+    ShowSuccess[Сообщение об успехе] --> End([Конец])
+    StopGen --> End
+
+    style Start fill:#90EE90
+    style End fill:#FFB6C1
+    style StopGen fill:#FF6B6B
+    style CheckImplemented fill:#FFD700
+    style HasCritical1 fill:#FFD700
+    style GenerateFull fill:#87CEEB
+    style ProcessedEvent fill:#98FB98
+    style BaseGen fill:#DDA0DD
