@@ -23,6 +23,7 @@ Private Type ClassConfig
     PrefixPorog As String      ' Префикс для диапазона порогов
     PrefixPath As String       ' Префикс для диапазона путей
     Paths() As PathInfo        ' Массив путей для класса
+    IsFullyImplemented As Boolean  ' Флаг готовности класса
 End Type
 
 Private Type GeneratorState
@@ -192,6 +193,45 @@ Private Sub LoadCharacterHistoryFromSheet()
     Next i
 End Sub
 
+Public Function GetClassConfig(ByVal className As String) As ClassConfig
+    Select Case UCase(Trim(className))
+        Case "МАГ"
+            With GetClassConfig
+                .className = "Маг"
+                .DataSheetName = "Источник_данных_Маг"
+                .EventSuffix = "_маг"
+                .PrefixOpasnost = "Опасность_Маг"
+                .PrefixPorog = "Порог_Опасности_Маг"
+                .PrefixPath = "Путь_Маг"
+                .IsFullyImplemented = True
+                
+                ReDim .Paths(1 To 4)
+                .Paths(1).Name = "Осторожность": .Paths(1).ColumnIndex = 2
+                .Paths(2).Name = "Политиканство": .Paths(2).ColumnIndex = 3
+                .Paths(3).Name = "Эксперименты": .Paths(3).ColumnIndex = 4
+                .Paths(4).Name = "Магические исследования": .Paths(4).ColumnIndex = 5
+            End With
+            
+        Case "ВЕДЬМАК"
+            With GetClassConfig
+                .className = "Ведьмак"
+                .DataSheetName = "Источник_данных_Ведьмак"
+                .EventSuffix = "_ведьмак"
+                .PrefixOpasnost = "Опасность_Ведьмак"
+                .PrefixPorog = "Порог_Опасности_Ведьмак"
+                .PrefixPath = "Путь_Ведьмак"
+                .IsFullyImplemented = False ' TODO: Завершить реализацию класса
+                
+                ReDim .Paths(1 To 4)
+                ' TODO: Добавить пути для Ведьмака
+            End With
+            
+        Case Else
+            ValidationLogger.AddValidationError "GetClassConfig", "КРИТИЧНО", _
+                                               "Неизвестный класс: " & className
+    End Select
+End Function
+
 ' Получение листа истории (без создания)
 Private Function GetHistorySheet() As Worksheet
     On Error Resume Next
@@ -206,7 +246,7 @@ End Function
 ' Инициализация состояния генератора
 Private Sub InitializeState(ByVal className As String)
     If Not State.IsInitialized Or State.Config.className <> className Then
-        State.Config = ClassConfiguration.GetClassConfig(className)
+        State.Config = GetClassConfig(className)
         State.IsInitialized = True
         State.IsValidated = False  ' Требуется новая валидация
     End If
